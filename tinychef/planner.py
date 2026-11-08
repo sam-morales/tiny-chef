@@ -4,8 +4,11 @@ Claude is forced to answer through a tool call, so the output is always structur
 Swaps only return the replaced meals; untouched meals are kept exactly as they were.
 """
 import json
+import logging
 
 import requests
+
+log = logging.getLogger("tinychef")
 
 from .config import Config
 
@@ -108,7 +111,7 @@ class ClaudeClient:
         if not self.api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
 
-    def call_tool(self, system, user, tool):
+    def _post(self, payload):
         resp = requests.post(
             self.URL,
             headers={
@@ -116,26 +119,48 @@ class ClaudeClient:
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
-            json={
-                "model": self.model,
-                "max_tokens": 8000,
-                "system": system,
-                "tools": [tool],
-                "tool_choice": {"type": "tool", "name": tool["name"]},
-                "messages": [{"role": "user", "content": user}],
-            },
-            timeout=180,
+            json=payload,
+            timeout=300,
         )
         if resp.status_code >= 400:
             try:
                 detail = resp.json().get("error", {}).get("message", resp.text)
             except ValueError:
                 detail = resp.text
-            raise RuntimeError(f"Anthropic API error {resp.status_code}: {detail}")
-        for block in resp.json()["content"]:
+            raise ApiError(resp.status_code, detail)
+        return resp.json()
+
+    def call_tool(self, system, user, tool):
+        base = {
+            "model": self.model,
+            "max_tokens": 16000,
+            "system": system,
+            "tools": [tool],
+        }
+        # 1st choice: force the tool. Some models/settings reject forced tool use
+        # (400), so fall back to letting Claude choose, with a firm instruction.
+        try:
+            data = self._post({**base, "tool_choice": {"type": "tool", "name": tool["name"]},
+                               "messages": [{"role": "user", "content": user}]})
+        except ApiError as e:
+            if e.status != 400:
+                raise
+            log.warning("Forced tool use rejected (%s); retrying with tool_choice=auto", e.detail)
+            nudge = f"{user}\n\nRespond only by calling the {tool['name']} tool."
+            data = self._post({**base, "tool_choice": {"type": "auto"},
+                               "messages": [{"role": "user", "content": nudge}]})
+        for block in data.get("content", []):
             if block.get("type") == "tool_use":
                 return block["input"]
+        if data.get("stop_reason") == "max_tokens":
+            raise RuntimeError("Claude ran out of room before finishing the plan (max_tokens)")
         raise RuntimeError("Claude did not return a tool call")
+
+
+class ApiError(RuntimeError):
+    def __init__(self, status, detail):
+        super().__init__(f"Anthropic API error {status}: {detail}")
+        self.status, self.detail = status, detail
 
 
 def _profile_text(family, learned, recent):

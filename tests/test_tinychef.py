@@ -169,3 +169,34 @@ def test_telegram_poll_and_whoami(setup, monkeypatch, capsys):
     telegram_poll.whoami()
     out = capsys.readouterr().out
     assert "Sam: 111" in out and "RECIPIENTS=111" in out
+
+
+def test_claude_client_falls_back_when_forced_tool_rejected(monkeypatch):
+    from tinychef import planner
+    sent = []
+
+    class Resp:
+        def __init__(self, code, body):
+            self.status_code, self._b, self.text = code, body, str(body)
+
+        def json(self):
+            return self._b
+
+    def fake_post(url, headers, json, timeout):
+        sent.append(json)
+        if json["tool_choice"]["type"] == "tool":
+            return Resp(400, {"error": {"message": "tool_choice not supported"}})
+        return Resp(200, {"content": [{"type": "text", "text": "ok"},
+                                      {"type": "tool_use", "input": {"meals": []}}]})
+
+    monkeypatch.setattr(planner.requests, "post", fake_post)
+    c = planner.ClaudeClient(api_key="k", model="m")
+    assert c.call_tool("sys", "plan", {"name": "submit_meal_plan"}) == {"meals": []}
+    assert sent[1]["tool_choice"] == {"type": "auto"} and "submit_meal_plan tool" in sent[1]["messages"][0]["content"]
+
+    def always_401(url, headers, json, timeout):
+        return Resp(401, {"error": {"message": "invalid x-api-key"}})
+
+    monkeypatch.setattr(planner.requests, "post", always_401)
+    with pytest.raises(planner.ApiError, match="invalid x-api-key"):
+        c.call_tool("sys", "plan", {"name": "t"})
