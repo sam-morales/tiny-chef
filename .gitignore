@@ -1,0 +1,7 @@
+# Private, per-server files — never commit these
+.env
+family.json
+*.db
+venv/
+__pycache__/
+.pytest_cache/

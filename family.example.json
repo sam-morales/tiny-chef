@@ -1,0 +1,17 @@
+{
+  "household": "2 adults, 2 kids (ages 6 and 9)",
+  "servings_per_meal": 4,
+  "meals_per_week": 5,
+  "meal_types": "weeknight dinners, with enough leftovers for 2 lunches where it makes sense",
+  "dietary_restrictions": [],
+  "dislikes": ["mushrooms", "very spicy food"],
+  "favorites": ["tacos", "sheet-pan chicken", "pasta", "stir fry"],
+  "max_active_minutes_weeknight": 30,
+  "prep_day": "Sunday",
+  "budget": "moderate",
+  "pantry_staples_to_skip": ["salt", "black pepper", "olive oil", "vegetable oil", "water"],
+  "notes": [
+    "Kids like mild flavors; adults can add heat at the table.",
+    "Prefer recipes where Sunday prep (chopping, marinating, cooking grains) cuts weeknight work."
+  ]
+}
