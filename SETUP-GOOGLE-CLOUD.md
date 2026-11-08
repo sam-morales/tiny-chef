@@ -47,10 +47,9 @@ title "Google Cloud server", paste, leave "Allow write access" **unchecked** →
 
 ```bash
 sudo apt-get install -y git
-git clone git@github.com:OWNER/tiny-chef.git
+git clone git@github.com:sam-morales/tiny-chef.git
 cd tiny-chef && bash install.sh
 ```
-(replace OWNER with your GitHub username)
 
 The installer:
 - installs Python and the bot's packages
