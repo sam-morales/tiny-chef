@@ -108,7 +108,7 @@ def test_commands(setup):
     service.handle_reply("+15551112222", "PREP")
     service.handle_reply("+15551112222", "help")
     t = sent_to(ch, "+15551112222")
-    assert "Chicken Tacos (serves 4)" in t and "PREP DAY PLAN" in t and "RECIPE 3" in t
+    assert "RECIPE 1: Chicken Tacos (Mon, serves 4" in t and "PREP DAY PLAN" in t and "RECIPE 3" in t
 
 
 def test_strangers_ignored(setup):
@@ -200,3 +200,20 @@ def test_claude_client_falls_back_when_forced_tool_rejected(monkeypatch):
     monkeypatch.setattr(planner.requests, "post", always_401)
     with pytest.raises(planner.ApiError, match="invalid x-api-key"):
         c.call_tool("sys", "plan", {"name": "t"})
+
+
+def test_weekly_send_includes_all_recipes_and_swap_sends_changed(setup):
+    ch, _ = setup
+    service.create_and_send_week(today=date(2026, 11, 14))
+    t = sent_to(ch, "+15551112222")
+    assert "PREP DAY PLAN" in t
+    for i, name in enumerate(["Chicken Tacos", "Salmon Rice Bowls", "Pasta Primavera"], 1):
+        assert f"RECIPE {i}: {name}" in t
+    ch.sent.clear()
+    service.handle_reply("+15551112222", "swap 2")
+    t = sent_to(ch, "+15553334444")
+    assert "RECIPE 2: Black Bean Bowls" in t and "RECIPE 1:" not in t
+    ch.sent.clear()
+    service.handle_reply("+15551112222", "recipes")
+    t = sent_to(ch, "+15551112222")
+    assert all(f"RECIPE {i}:" in t for i in (1, 2, 3))

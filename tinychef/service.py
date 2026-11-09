@@ -30,14 +30,28 @@ def _skip(family):
     return family.get("pantry_staples_to_skip", [])
 
 
-def _send_full_plan(plan, week_of, header="Meals for the week of", to=None):
+def _send_full_plan(plan, week_of, header="Meals for the week of", to=None, recipes=None):
+    """Meals + grocery list, then (optionally) the prep plan and a full recipe per meal.
+
+    recipes: None = no recipes, "all" = every meal, or a list of 1-based meal numbers.
+    """
     family = load_family()
     texts = [messages.meals_text(plan, week_of, header), messages.grocery_text(plan, _skip(family))]
+    if recipes:
+        nums = range(1, len(plan["meals"]) + 1) if recipes == "all" else recipes
+        texts.append(messages.prep_text(plan))
+        texts += [messages.recipe_text(plan, n) for n in nums]
     for t in texts:
         if to:
             channels.send(to, t)
         else:
             channels.broadcast(t)
+
+
+def _send_recipes_only(plan, to):
+    channels.send(to, messages.prep_text(plan))
+    for n in range(1, len(plan["meals"]) + 1):
+        channels.send(to, messages.recipe_text(plan, n))
 
 
 def create_and_send_week(today=None, force=False):
@@ -48,7 +62,7 @@ def create_and_send_week(today=None, force=False):
     family = load_family()
     plan = planner.generate_plan(get_llm(), family, store.learned_prefs(), store.recent_meal_names())
     store.save_plan(week_of, plan, "weekly")
-    _send_full_plan(plan, week_of)
+    _send_full_plan(plan, week_of, recipes="all")
     return plan
 
 
@@ -83,6 +97,8 @@ def handle_reply(sender, text):
 
     if cmd in ("LIST", "MEALS", "GROCERIES", "GROCERY"):
         return _send_full_plan(plan, week_of, to=sender)
+    if cmd in ("RECIPES", "ALL RECIPES"):
+        return _send_recipes_only(plan, sender)
     if cmd == "PREP":
         return channels.send(sender, messages.prep_text(plan))
     m = re.fullmatch(r"(?:RECIPE|R)\s*#?\s*(\d+)", cmd)
@@ -103,7 +119,7 @@ def handle_reply(sender, text):
         store.add_learned_prefs(remember)
     store.save_plan(week_of, new_plan, body)
     nums = ", ".join(str(n) for n in changed)
-    _send_full_plan(new_plan, week_of, header=f"Updated (changed {nums}) - week of")
+    _send_full_plan(new_plan, week_of, header=f"Updated (changed {nums}) - week of", recipes=changed)
     if remember:
         channels.send(sender, "I'll remember for future weeks: " + "; ".join(remember) + " (reply FORGET to undo)")
 

@@ -36,7 +36,7 @@ MEAL = {
         "servings": {"type": "integer"},
         "prep_ahead": {"type": "string", "description": "What to do for this meal on prep day"},
         "ingredients": {"type": "array", "items": INGREDIENT},
-        "steps": {"type": "array", "items": {"type": "string"}, "description": "Weeknight cooking steps, concise"},
+        "steps": {"type": "array", "items": {"type": "string"}, "description": "Complete weeknight cooking steps a home cook can follow with no other reference: include oven temperatures, heat levels, cook times and doneness cues, and say where prep-day work gets used. Usually 5-10 steps."},
     },
     "required": ["name", "day", "summary", "active_minutes", "servings", "prep_ahead", "ingredients", "steps"],
 }

@@ -24,7 +24,7 @@ You reply ──► commands (RECIPE 3, PREP, LIST, NEW, HELP) answered directly
 | Reply | What happens |
 |---|---|
 | any sentence | swap/adjust meals, e.g. "swap 3 for a slow cooker meal" |
-| `RECIPE 2` | full ingredients and steps for meal 2 |
+| `RECIPE 2` / `RECIPES` | resend one recipe / all recipes (they also arrive with every plan) |
 | `PREP` | prep-day plan covering all meals |
 | `LIST` | resend meals + grocery list |
 | `NEW` | a completely new plan |

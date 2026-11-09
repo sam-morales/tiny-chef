@@ -6,7 +6,7 @@ MAX_LEN = 1500  # Twilio caps a single message body at 1600 chars
 HELP = (
     "Tiny Chef - reply with:\n"
     "- Any swap request, e.g. \"swap 2 and 4 for something vegetarian\" or \"no fish this week\"\n"
-    "- RECIPE 3 for full steps of meal 3\n"
+    "- RECIPE 3 for full steps of meal 3, RECIPES for all of them\n"
     "- PREP for the prep-day plan\n"
     "- LIST to resend meals + groceries\n"
     "- NEW for a whole new plan\n"
@@ -37,9 +37,10 @@ def recipe_text(plan, n):
     if not 1 <= n <= len(plan["meals"]):
         return f"There's no meal {n}. Meals are numbered 1-{len(plan['meals'])}."
     m = plan["meals"][n - 1]
-    lines = [f"{n}. {m['name']} (serves {m['servings']})", "", "INGREDIENTS"]
+    lines = [f"RECIPE {n}: {m['name']} ({m['day']}, serves {m['servings']}, {m['active_minutes']} min)", "", "INGREDIENTS"]
     for ing in m["ingredients"]:
-        lines.append(f"- {ing['quantity']:g} {ing['unit']} {ing['item']}")
+        unit = "" if (ing.get("unit") or "").lower() in ("", "each", "whole", "piece") else f" {ing['unit']}"
+        lines.append(f"- {ing['quantity']:g}{unit} {ing['item']}")
     lines += ["", f"PREP AHEAD: {m['prep_ahead']}", "", "STEPS"]
     lines += [f"{i}. {s}" for i, s in enumerate(m["steps"], 1)]
     return "\n".join(lines)
