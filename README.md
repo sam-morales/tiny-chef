@@ -29,7 +29,17 @@ You reply ──► commands (RECIPE 3, PREP, LIST, NEW, HELP) answered directly
 | `LIST` | resend meals + grocery list |
 | `NEW` | a completely new plan |
 | `PREFS` / `FORGET` | see / clear what it has learned |
+| `FAMILY` | who's on Tiny Chef, and who's waiting to join |
+| `APPROVE 1` / `APPROVE 1 Wife` | let a new person in (optionally saving them under a name) |
+| `REMOVE Wife` | remove someone added in chat |
 | `HELP` | this list |
+
+## Adding family members
+
+No server login needed. The new person opens your bot in Telegram, taps **Start** and
+sends any message. Everyone already on Tiny Chef gets "<name> wants to join… Reply
+APPROVE 1". Once someone approves, the new person gets a welcome, the commands and
+this week's plan, and from then on everything the family gets.
 
 ## Server commands
 

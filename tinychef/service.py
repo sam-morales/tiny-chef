@@ -66,14 +66,86 @@ def create_and_send_week(today=None, force=False):
     return plan
 
 
-def handle_reply(sender, text):
-    """Process an incoming text. Returns nothing; all responses are sent as texts."""
+def _handle_stranger(sender, name):
+    """Someone not in the family messaged the bot: ask the family to approve them."""
+    if Config.CHANNEL != "telegram":
+        return  # SMS strangers are ignored (and cost money to answer)
+    req = store.add_join_request(sender, name)
+    if req is None:
+        return channels.send(sender, "Still waiting for the family to approve you. Hang tight!")
+    channels.send(sender, f"Hi {name}! Tiny Chef is a private family meal planner. "
+                          "I've asked the family to let you in. You'll get a message here once you're approved.")
+    channels.broadcast(f"{name} wants to join Tiny Chef.\nReply APPROVE {req} to add them "
+                       f"(or APPROVE {req} Wife to save them under a different name).")
+
+
+def _handle_family_command(sender, body, cmd, name):
+    """APPROVE / FAMILY / REMOVE. Returns True if handled."""
+    m = re.fullmatch(r"APPROVE\s*#?\s*(\d*)\s*(.*)", body, flags=re.I | re.S)
+    if m:
+        pending = store.join_requests()
+        if m.group(1):
+            req_id = int(m.group(1))
+        elif len(pending) == 1:
+            req_id = pending[0]["id"]
+        else:
+            channels.send(sender, "No one is waiting to join." if not pending else
+                          "Several people are waiting:\n" + "\n".join(f"{p['id']}. {p['name']}" for p in pending)
+                          + "\nReply APPROVE and their number.")
+            return True
+        req = store.pop_join_request(req_id)
+        if not req:
+            channels.send(sender, f"There's no join request number {req_id}. Reply FAMILY to see who's waiting.")
+            return True
+        new_name = m.group(2).strip() or req["name"]
+        store.add_member(req["chat_id"], new_name)
+        channels.send(req["chat_id"], f"Welcome to Tiny Chef, {new_name}! 🍳 You'll get the meal plan, grocery list "
+                                      "and recipes every Saturday at 7pm.\n\n" + messages.HELP)
+        current = store.current_plan()
+        if current:
+            _send_full_plan(current["plan"], current["week_of"], header="This week's plan, week of", to=req["chat_id"])
+        channels.broadcast(f"{new_name} joined Tiny Chef (approved by {name}).", exclude=(req["chat_id"],))
+        return True
+
+    if cmd == "FAMILY":
+        lines = ["TINY CHEF FAMILY"]
+        lines += [f"- Set up on server (id {r})" for r in Config.RECIPIENTS]
+        lines += [f"- {m['name']}" for m in store.members()]
+        pending = store.join_requests()
+        if pending:
+            lines += ["", "Waiting to join:"] + [f"{p['id']}. {p['name']} (reply APPROVE {p['id']})" for p in pending]
+        lines += ["", "To add someone: they message this bot, then you reply APPROVE.",
+                  "To remove: REMOVE and their name."]
+        channels.send(sender, "\n".join(lines))
+        return True
+
+    m = re.fullmatch(r"REMOVE\s+(.+)", body, flags=re.I | re.S)
+    if m:
+        target = m.group(1).strip().lower()
+        match = [x for x in store.members() if x["name"].lower() == target]
+        if not match:
+            channels.send(sender, f"No one named {m.group(1).strip()} was added in chat. Reply FAMILY to see the list. "
+                                  "(People set up on the server are removed there with: tiny-chef settings)")
+            return True
+        store.remove_member(match[0]["chat_id"])
+        channels.send(match[0]["chat_id"], "You've been removed from Tiny Chef. Message me again if you want back in.")
+        channels.send(sender, f"Removed {match[0]['name']}.")
+        return True
+    return False
+
+
+def handle_reply(sender, text, name=None):
+    """Process an incoming message. Returns nothing; all responses are sent as messages."""
     store.log_message("in", sender, text)
-    if Config.RECIPIENTS and sender not in Config.RECIPIENTS:
-        return  # ignore strangers silently
+    name = name or "Someone"
+    family = channels.recipients()
+    if family and sender not in family:
+        return _handle_stranger(sender, name)
 
     body = text.strip()
     cmd = body.upper()
+    if _handle_family_command(sender, body, cmd, name):
+        return
     current = store.current_plan()
 
     if cmd in ("HELP", "?", "INFO"):

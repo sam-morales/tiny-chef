@@ -6,7 +6,7 @@ import time
 
 from flask import Flask, abort, request
 
-from . import channels, service
+from . import channels, service, telegram_poll
 from .config import Config
 
 log = logging.getLogger("tinychef")
@@ -53,7 +53,7 @@ def telegram_inbound():
     msg = (request.get_json(silent=True) or {}).get("message") or {}
     text, chat = msg.get("text"), (msg.get("chat") or {}).get("id")
     if text and chat is not None:
-        _run_async(service.handle_reply, str(chat), text)
+        _run_async(service.handle_reply, str(chat), text, telegram_poll._name(msg))
     return {"ok": True}
 
 

@@ -10,7 +10,8 @@ HELP = (
     "- PREP for the prep-day plan\n"
     "- LIST to resend meals + groceries\n"
     "- NEW for a whole new plan\n"
-    "- PREFS to see what I've learned, FORGET to clear it"
+    "- PREFS to see what I've learned, FORGET to clear it\n"
+    "- FAMILY to see who's on Tiny Chef (new people: they message this bot, you reply APPROVE)"
 )
 
 

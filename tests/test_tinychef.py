@@ -217,3 +217,51 @@ def test_weekly_send_includes_all_recipes_and_swap_sends_changed(setup):
     service.handle_reply("+15551112222", "recipes")
     t = sent_to(ch, "+15551112222")
     assert all(f"RECIPE {i}:" in t for i in (1, 2, 3))
+
+
+def test_join_approval_flow(setup, monkeypatch):
+    ch, _ = setup
+    monkeypatch.setattr(Config, "CHANNEL", "telegram")
+    monkeypatch.setattr(Config, "RECIPIENTS", ["111"])
+    service.create_and_send_week(today=date(2026, 11, 14))
+    ch.sent.clear()
+
+    # Wife messages the bot: she gets a holding reply, the family gets a request
+    service.handle_reply("222", "hi", name="Maria")
+    assert "asked the family" in sent_to(ch, "222")
+    assert "Maria wants to join" in sent_to(ch, "111") and "APPROVE 1" in sent_to(ch, "111")
+    service.handle_reply("222", "hello?", name="Maria")  # no duplicate request
+    assert sent_to(ch, "111").count("wants to join") == 1
+
+    # Approve with a custom name
+    ch.sent.clear()
+    service.handle_reply("111", "approve 1 Wife", name="Sam")
+    assert "Welcome to Tiny Chef, Wife" in sent_to(ch, "222")
+    assert "GROCERY LIST" in sent_to(ch, "222")              # gets this week's plan
+    assert "Wife joined Tiny Chef (approved by Sam)" in sent_to(ch, "111")
+    assert channels.recipients() == ["111", "222"]
+
+    # She's now a full member: swaps go to both, and she can use commands
+    ch.sent.clear()
+    service.handle_reply("222", "swap 2")
+    assert "Updated (changed 2)" in sent_to(ch, "111") and "Updated (changed 2)" in sent_to(ch, "222")
+    service.handle_reply("111", "FAMILY")
+    assert "- Wife" in sent_to(ch, "111")
+
+    # Remove
+    ch.sent.clear()
+    service.handle_reply("111", "remove wife")
+    assert "Removed Wife" in sent_to(ch, "111") and channels.recipients() == ["111"]
+
+
+def test_approve_without_number_and_unknown(setup, monkeypatch):
+    ch, _ = setup
+    monkeypatch.setattr(Config, "CHANNEL", "telegram")
+    monkeypatch.setattr(Config, "RECIPIENTS", ["111"])
+    service.handle_reply("111", "APPROVE")
+    assert "No one is waiting" in sent_to(ch, "111")
+    service.handle_reply("333", "hi", name="Kid")
+    service.handle_reply("111", "APPROVE")          # only one pending → approves it
+    assert "333" in channels.recipients()
+    service.handle_reply("111", "APPROVE 99")
+    assert "no join request number 99" in sent_to(ch, "111")

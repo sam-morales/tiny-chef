@@ -73,6 +73,14 @@ def send(to, text):
     store.log_message("out", to, text)
 
 
-def broadcast(text):
-    for r in Config.RECIPIENTS:
-        send(r, text)
+def recipients():
+    """Everyone in the family: RECIPIENTS from .env plus people approved in chat."""
+    out = list(Config.RECIPIENTS)
+    out += [m["chat_id"] for m in store.members() if m["chat_id"] not in out]
+    return out
+
+
+def broadcast(text, exclude=()):
+    for r in recipients():
+        if r not in exclude:
+            send(r, text)

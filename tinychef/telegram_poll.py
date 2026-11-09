@@ -22,6 +22,12 @@ def _api(method, **params):
     return r.json()["result"]
 
 
+def _name(msg):
+    u = msg.get("from") or msg.get("chat") or {}
+    name = " ".join(filter(None, [u.get("first_name"), u.get("last_name")]))
+    return name or (("@" + u["username"]) if u.get("username") else "Someone")
+
+
 def whoami():
     """Print chat ids of everyone who has messaged the bot recently."""
     _api("deleteWebhook")  # getUpdates doesn't work while a webhook is set
@@ -57,7 +63,7 @@ def run(poll_once=False):
                 text, chat = msg.get("text"), (msg.get("chat") or {}).get("id")
                 if text and chat is not None:
                     try:
-                        service.handle_reply(str(chat), text)
+                        service.handle_reply(str(chat), text, name=_name(msg))
                     except Exception:
                         log.exception("failed handling message")
                         service.channels.send(str(chat), "Sorry, something went wrong. Try again in a minute.")

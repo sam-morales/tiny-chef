@@ -27,6 +27,17 @@ CREATE TABLE IF NOT EXISTS messages (
     body TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS members (
+    chat_id TEXT PRIMARY KEY,       -- people added from chat (in addition to RECIPIENTS in .env)
+    name TEXT NOT NULL,
+    added_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS join_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    requested_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sends (
     week_of TEXT PRIMARY KEY,       -- guards against double weekly sends
     sent_at TEXT NOT NULL
@@ -115,3 +126,42 @@ def mark_sent(week_of):
     with db() as c:
         cur = c.execute("INSERT OR IGNORE INTO sends(week_of, sent_at) VALUES (?,?)", (week_of, _now()))
         return cur.rowcount == 1
+
+
+# --- Family membership -------------------------------------------------------
+
+def members():
+    with db() as c:
+        return [dict(r) for r in c.execute("SELECT chat_id, name FROM members ORDER BY added_at")]
+
+
+def add_member(chat_id, name):
+    with db() as c:
+        c.execute("INSERT OR REPLACE INTO members(chat_id, name, added_at) VALUES (?,?,?)", (chat_id, name, _now()))
+        c.execute("DELETE FROM join_requests WHERE chat_id=?", (chat_id,))
+
+
+def remove_member(chat_id):
+    with db() as c:
+        return c.execute("DELETE FROM members WHERE chat_id=?", (chat_id,)).rowcount == 1
+
+
+def add_join_request(chat_id, name):
+    """Returns the request number, or None if this person already asked."""
+    with db() as c:
+        cur = c.execute("INSERT OR IGNORE INTO join_requests(chat_id, name, requested_at) VALUES (?,?,?)",
+                        (chat_id, name, _now()))
+        return cur.lastrowid if cur.rowcount == 1 else None
+
+
+def join_requests():
+    with db() as c:
+        return [dict(r) for r in c.execute("SELECT id, chat_id, name FROM join_requests ORDER BY id")]
+
+
+def pop_join_request(req_id):
+    with db() as c:
+        r = c.execute("SELECT id, chat_id, name FROM join_requests WHERE id=?", (req_id,)).fetchone()
+        if r:
+            c.execute("DELETE FROM join_requests WHERE id=?", (req_id,))
+        return dict(r) if r else None
