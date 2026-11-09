@@ -47,7 +47,14 @@ class FakeLLM:
 
 @pytest.fixture(autouse=True)
 def setup(tmp_path, monkeypatch):
+    # Tests must not depend on the real .env / family.json of the machine running them
+    # (the server runs these before every update).
+    from pathlib import Path
     monkeypatch.setattr(Config, "DB_PATH", str(tmp_path / "t.db"))
+    monkeypatch.setattr(Config, "CHANNEL", "console")
+    monkeypatch.setattr(Config, "FAMILY_FILE", str(Path(__file__).parent.parent / "family.example.json"))
+    for k in ("ANTHROPIC_API_KEY", "TELEGRAM_BOT_TOKEN", "TWILIO_AUTH_TOKEN", "PUBLIC_BASE_URL", "CRON_SECRET"):
+        monkeypatch.setattr(Config, k, None)
     monkeypatch.setattr(Config, "RECIPIENTS", ["+15551112222", "+15553334444"])
     ch = channels.ConsoleChannel()
     channels.set_channel(ch)
@@ -111,7 +118,7 @@ def test_commands(setup):
     assert "RECIPE 1: Chicken Tacos (Mon, serves 4" in t and "PREP DAY PLAN" in t and "RECIPE 3" in t
 
 
-def test_strangers_ignored(setup):
+def test_sms_strangers_ignored(setup):
     ch, _ = setup
     service.handle_reply("+19998887777", "help")
     assert ch.sent == []
